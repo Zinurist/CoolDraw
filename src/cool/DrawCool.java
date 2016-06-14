@@ -22,12 +22,13 @@ public class DrawCool extends JPanel implements Runnable{
 	private boolean focus,leftButton;
 	private ColorPalette color;
 	
-	private int drawWidth,mx,my,alpha;
+	private int drawWidth,blurWidth,mx,my,alpha;
 	
 	public DrawCool(){
 		pw=ph=500;
 		fw=fh=30;
 		drawWidth=0;
+		blurWidth=0;
 		alpha=250;
 		border=new int[]{50,50,250,150};
 		setPreferredSize(new Dimension(pw+fw+fw,ph+fh+fh));
@@ -44,6 +45,14 @@ public class DrawCool extends JPanel implements Runnable{
 						alpha=0;
 					}else if(alpha>250){
 						alpha=250;
+					}
+				}else if(me.isControlDown()){
+					int old=blurWidth;
+					blurWidth-=me.getWheelRotation();
+					if(blurWidth<3){
+						blurWidth=old<blurWidth?3:0;
+					}else if(blurWidth>100){
+						blurWidth=100;
 					}
 				}else{
 					
@@ -87,7 +96,7 @@ public class DrawCool extends JPanel implements Runnable{
 								fill(e.getX(),e.getY());
 							}
 						}.start();		
-					}else if(e.isAltDown()){
+					}else if(e.isControlDown()){
 						new Thread(){
 							public void run(){
 								fillAni(e.getX(),e.getY());
@@ -161,6 +170,10 @@ public class DrawCool extends JPanel implements Runnable{
 			g.setColor(Color.BLACK);
 			g.drawOval(mx-drawWidth/2, my-drawWidth/2, drawWidth, drawWidth);
 		}
+		if(focus && blurWidth>0){
+			g.setColor(Color.GRAY);
+			g.drawRect(mx-blurWidth/2, my-blurWidth/2, blurWidth-1, blurWidth-1);
+		}
 		
 		g.setColor(new Color(border[0],border[1],border[2],border[3]));
 		g.fillRect(0,0,getWidth(),fh);
@@ -186,11 +199,45 @@ public class DrawCool extends JPanel implements Runnable{
 		
 		Graphics g=img.getGraphics();
 		g.setColor(color.getSelectedColor(alpha));
-		if(drawWidth>0){
+		if(blurWidth>0){//either blur or draw, not both
+			Color colorAvg[][] = new Color[blurWidth][blurWidth];
+			int startX = mx-blurWidth/2 +1;
+			int startY = my-blurWidth/2 +1;
+			if(startX<1) startX=1;
+			if(startY<1) startY=1;
+			int tmpWidth=blurWidth;
+			int difToRight=img.getWidth()-1-(mx+blurWidth/2);
+			int difToBottom=img.getHeight()-1-(my+blurWidth/2);
+			difToBottom=Math.min(difToBottom, difToRight);
+			if(difToBottom<0){
+				tmpWidth+=difToBottom;
+			}
+			for(int x=0; x<tmpWidth-2; x++){
+				for(int y=0; y<tmpWidth-2; y++){
+					int avgr = 0; int avgg = 0; int avgb = 0;
+					Color c;
+					for(int k=0; k<9; k++){
+						c = new Color(img.getRGB(startX+x+(k%3)-1, startY+y+(k/3)-1));
+						avgr += c.getRed();
+						avgg += c.getGreen();
+						avgb += c.getBlue();
+					}
+					colorAvg[x][y] = new Color(avgr/9, avgg/9, avgb/9);
+				}
+			}
+			for(int x=0; x<tmpWidth-2; x++){
+				for(int y=0; y<tmpWidth-2; y++){
+					g.setColor( colorAvg[x][y] );
+					g.drawLine(startX+x, startY+y, startX+x, startY+y);
+				}
+			}
+		}else if(drawWidth>0){
 			g.fillOval(mx-drawWidth/2, my-drawWidth/2, drawWidth, drawWidth);
 		}else{
 			g.drawLine(mx, my, oldX, oldY);
 		}
+		
+		
 		repaint();
 	}
 	
